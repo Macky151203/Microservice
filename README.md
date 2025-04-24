@@ -15,8 +15,10 @@ Whenever a new order is added, The same order's order_id and type(push or track)
 
 
 TrackingService-
-In trackingservice, the tracking details for the orders are store in trackingDB based on the orderid as key.
+In trackingservice, the tracking details for the orders are stored in trackingDB(SQLite) based on the orderid as key.
 
 Functions-
 1. Update the location or data(current place where the order is)
 2. Listen to the message queues continuously and if there is push message(new order) then add it to the trackingDB and if there is a track message then get the data using orderid from the trackingDB and push it to another queue from where the order service will be listening for the response.
+
+So both these services interact with each other without exposing their endpoints using a message queue.
