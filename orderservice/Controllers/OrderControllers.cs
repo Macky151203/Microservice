@@ -7,25 +7,28 @@ using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
 using System.Text.Json;
 using System;
+using OrderService.Services;
 
 [Route("/api/[controller]")]
 [ApiController]
 
 public class OrdersController : ControllerBase
 {
-    private readonly OrderDBContext _orderDBContext;
-    private readonly IDatabase _redisDB;
-    private const string RedisKey = "queue";
-    private const string RedisKey2 = "queue2";
-    public OrdersController(OrderDBContext orderDBContext, IConnectionMultiplexer redis)//injecting the db context that we have registered in program.cs
+    // private readonly OrderDBContext _orderDBContext;
+    // private readonly IDatabase _redisDB;
+    // private const string RedisKey = "queue";
+    // private const string RedisKey2 = "queue2";
+    private readonly IOrderServices _orderService;
+    public OrdersController(IOrderServices orderService)//injecting the db context that we have registered in program.cs
     {
-        _orderDBContext = orderDBContext;
-        _redisDB = redis.GetDatabase();
+        // _orderDBContext = orderDBContext;
+        // _redisDB = redis.GetDatabase();
+        _orderService=orderService;
     }
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
-        var orders = await _orderDBContext.Order.ToListAsync();
+        var orders = await _orderService.GetAllAsync();
         if (orders.Count == 0)
         {
             return NotFound("No orders found");
@@ -40,14 +43,15 @@ public class OrdersController : ControllerBase
         {
             return BadRequest("Invalid order data.");
         }
-        await _orderDBContext.Order.AddAsync(order);
-        await _orderDBContext.SaveChangesAsync();
-        //after adding to order make a push to the redis queue with orderid and type as push
-        var orderId = order.Id.ToString();
-        var orderType = "push";
-        var orderData = new { Id = orderId, Type = orderType };
-        var orderDataJson = JsonSerializer.Serialize(orderData);
-        await _redisDB.ListRightPushAsync(RedisKey, orderDataJson);
+        var neworder=await _orderService.CreateOrderAsync(order);
+        // await _orderDBContext.Order.AddAsync(order);
+        // await _orderDBContext.SaveChangesAsync();
+        // //after adding to order make a push to the redis queue with orderid and type as push
+        // var orderId = order.Id.ToString();
+        // var orderType = "push";
+        // var orderData = new { Id = orderId, Type = orderType };
+        // var orderDataJson = JsonSerializer.Serialize(orderData);
+        // await _redisDB.ListRightPushAsync(RedisKey, orderDataJson);
 
         //try popping to check push and also need to make new class obj for incoming response
         // var data = await _redisDB.ListLeftPopAsync(RedisKey);
@@ -70,10 +74,16 @@ public class OrdersController : ControllerBase
     [HttpGet("/track/{id}")]
     public async Task<IActionResult> GetDetailsByd(Guid id)
     {
+        var response = await _orderService.GetTrackingAsync(id);
+        if (response == null)
+        {
+            return NotFound("No tracking data found");
+        }
+        return Ok(response);
         //push to the mq with type as track 
-        var trackingdata = new { Id = id.ToString(), Type = "track" };
-        var trackingdataJson = JsonSerializer.Serialize(trackingdata);
-        await _redisDB.ListRightPushAsync(RedisKey, trackingdataJson);
+        // var trackingdata = new { Id = id.ToString(), Type = "track" };
+        // var trackingdataJson = JsonSerializer.Serialize(trackingdata);
+        // await _redisDB.ListRightPushAsync(RedisKey, trackingdataJson);
 
 
         //listen from another queue for response
@@ -87,32 +97,26 @@ public class OrdersController : ControllerBase
         // Console.WriteLine($"Order Type: {trackingDataFromQueue.Type}");
 
         // return NoContent();
-        var timeout = TimeSpan.FromSeconds(10);
-        var startTime = DateTime.UtcNow;
+        // var timeout = TimeSpan.FromSeconds(10);
+        // var startTime = DateTime.UtcNow;
 
-        while ((DateTime.UtcNow - startTime) < timeout)
-        {
-            var result = await _redisDB.ListLeftPopAsync(RedisKey2);
-            if (!result.IsNullOrEmpty)
-            {
-                //need to change object for receiving response from queue
-                var trackingDataFromQueue = JsonSerializer.Deserialize<TrackingData>(result);
-                Console.WriteLine($"Order ID: {Guid.Parse(trackingDataFromQueue.Id.ToString())}");
-                Console.WriteLine($"Order Type: {trackingDataFromQueue.Type}");
-                Console.WriteLine($"Order Status: {trackingDataFromQueue.Status}");
-                Console.WriteLine($"Order Location: {trackingDataFromQueue.Location}");
-                return Ok(trackingDataFromQueue);
-            }
+        // while ((DateTime.UtcNow - startTime) < timeout)
+        // {
+        //     var result = await _redisDB.ListLeftPopAsync(RedisKey2);
+        //     if (!result.IsNullOrEmpty)
+        //     {
+        //         //need to change object for receiving response from queue
+        //         var trackingDataFromQueue = JsonSerializer.Deserialize<TrackingData>(result);
+        //         Console.WriteLine($"Order ID: {Guid.Parse(trackingDataFromQueue.Id.ToString())}");
+        //         Console.WriteLine($"Order Type: {trackingDataFromQueue.Type}");
+        //         Console.WriteLine($"Order Status: {trackingDataFromQueue.Status}");
+        //         Console.WriteLine($"Order Location: {trackingDataFromQueue.Location}");
+        //         return Ok(trackingDataFromQueue);
+        //     }
 
-            await Task.Delay(500);
-        }
+        //     await Task.Delay(500);
+        // }
 
-        return NotFound("No tracking data found within the timeout period.");
+        // return NotFound("No tracking data found within the timeout period.");
     }
-}
-public class TrackingData{
-    public Guid Id { get; set; } //order id
-    public string Type { get; set; } 
-    public string Status { get; set; } 
-    public string Location { get; set; } //location of the order
 }
