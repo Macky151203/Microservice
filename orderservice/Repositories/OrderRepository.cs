@@ -8,12 +8,21 @@ public class OrderRepository : IOrderRepository
 {
     private readonly OrderDBContext _orderDBContext;
     private readonly IDatabase _redisDB;
-    private const string RedisKey = "queue";
-    private const string RedisKey2 = "queue2";
-    public OrderRepository(OrderDBContext orderDBContext, IConnectionMultiplexer redis)
+    private readonly HttpClient _httpClient;
+    private string RedisKey;
+    private string RedisKey2;
+    private readonly string _trackingserviceurl;
+
+    private readonly IConfiguration _configuration;
+    public OrderRepository(OrderDBContext orderDBContext, IConnectionMultiplexer redis, IHttpClientFactory httpClientFactory, IConfiguration configuration)
     {
+        _configuration = configuration;
+        _trackingserviceurl= _configuration.GetValue<string>("TrackingService:BaseUrl");
         _orderDBContext = orderDBContext;
         _redisDB = redis.GetDatabase();
+        _httpClient = httpClientFactory.CreateClient();
+        RedisKey = _configuration.GetValue<string>("RedisKey:Key1");
+        RedisKey2 = _configuration.GetValue<string>("RedisKey:Key2");
     }
     public async Task<List<Orders>> GetAllAsync()
     {
@@ -26,33 +35,34 @@ public class OrderRepository : IOrderRepository
         await _orderDBContext.Order.AddAsync(order);
         await _orderDBContext.SaveChangesAsync();
         //after adding to order make a push to the redis queue with orderid and type as push
-        var orderId = order.Id.ToString();
+        var url=_trackingserviceurl;
+        var orderId = order.Id;
         var orderType = "push";
         var orderData = new { Id = orderId, Type = orderType };
         var orderDataJson = JsonSerializer.Serialize(orderData);
-        await _redisDB.ListRightPushAsync(RedisKey, orderDataJson);
+        var content = new StringContent(orderDataJson, System.Text.Encoding.UTF8, "application/json");
+        var response = await _httpClient.PostAsync(url, content);
 
-        //try popping to check push and also need to make new class obj for incoming response
-        // var data = await _redisDB.ListLeftPopAsync(RedisKey);
-        // var orderDataFromQueue = JsonSerializer.Deserialize<OrderExtract>(data);
-        // if (orderDataFromQueue == null)
-        // {
-        //     return BadRequest("Failed to pop order data from queue.");
-        // }
-        // Console.WriteLine($"Order ID: {Guid.Parse(orderDataFromQueue.Id.ToString())}");
-        // //create a new model to store orderid and type
-        // Console.WriteLine($"Order Type: {orderDataFromQueue.Type}");
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+        return order;
+        //for queue logic
+        //await _redisDB.ListRightPushAsync(RedisKey, orderDataJson);
+
 
         //It is getting popped , so now do the same in the other service by popping and adding to tracking db
         //To send data back to the order service, listen to a queue after send get tracking requesting to the main queue
 
-        return order;
+        // return order;
     }
     public async Task<TrackingData> GetTrackingAsync(Guid id)
     {
         var trackingdata = new { Id = id.ToString(), Type = "track" };
         var trackingdataJson = JsonSerializer.Serialize(trackingdata);
         await _redisDB.ListRightPushAsync(RedisKey, trackingdataJson);
+        //return above
         // return await _orderDBContext.TrackingData.FirstOrDefaultAsync(x => x.OrderId == id);
         var timeout = TimeSpan.FromSeconds(10);
         var startTime = DateTime.UtcNow;

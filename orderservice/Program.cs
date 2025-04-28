@@ -20,6 +20,7 @@ builder.Services.AddDbContext<OrderDBContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IOrderServices, OrderServices>();
+builder.Services.AddHttpClient();
 
 var app = builder.Build();
 

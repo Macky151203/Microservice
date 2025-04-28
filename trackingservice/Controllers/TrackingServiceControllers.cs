@@ -32,4 +32,34 @@ public class TrackingServiceController : ControllerBase
         }
         return Ok(trackingData);
     }
+
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] OrderExtract Data)
+    {
+        if (Data == null)
+        {
+            return BadRequest("Invalid tracking data.");
+        }
+        
+        var orderId = Data.Id;
+        var orderType = "push";
+        var trackingData = new TrackingData{ Id = orderId, Type = orderType, Status = "In  warehouse", Location = "Location" };
+        // var trackingDataJson = JsonSerializer.Serialize(trackingData);
+        
+        await _trackingDBContext.Tracking.AddAsync(trackingData);
+        await _trackingDBContext.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetAll), new { id = trackingData.Id }, trackingData);
+    }
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetById(Guid id)
+    {
+        var trackingData = await _trackingDBContext.Tracking.FirstOrDefaultAsync(x => x.Id == id);
+        if (trackingData == null)
+        {
+            return NotFound("Tracking data not found.");
+        }
+        return Ok(trackingData);
+    }
 }
