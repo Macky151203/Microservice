@@ -6,7 +6,7 @@ public class TrackingDBContext : DbContext
 {
     public TrackingDBContext(DbContextOptions<TrackingDBContext> options) : base(options)
     {
-        Console.WriteLine("TrackingDBContext constructor called.");
+        // Console.WriteLine("TrackingDBContext constructor called.");
     }
 
     public DbSet<TrackingData> Tracking { get; set; }

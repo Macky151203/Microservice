@@ -17,9 +17,5 @@ public class OrderServices : IOrderServices
     {
         return await _orderRepository.CreateOrderAsync(order);
     }
-    public async Task<TrackingData> GetTrackingAsync(Guid id)
-    {
-        return await _orderRepository.GetTrackingAsync(id);
-    }
 
 }
