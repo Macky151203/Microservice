@@ -57,6 +57,7 @@ public class TrackingServiceWorker : BackgroundService
                         _logger.LogInformation($"Order Type: {ordertype}");
                         Console.WriteLine("Order tracking added.");
                     }
+                    //no need of this else if
                     else if (ordertype == "track")
                     {
                         // Get order from the database and push to queue2

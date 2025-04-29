@@ -33,7 +33,20 @@ public class TrackingServiceController : ControllerBase
         return Ok(trackingData);
     }
 
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] TrackingData trackingData){
+        var existingTrackingData= await _trackingDBContext.Tracking.FirstOrDefaultAsync(x=>x.Id==id);
+        if(existingTrackingData==null){
+            return NotFound("Tracking data not found.");
+        }
+        existingTrackingData.Status=trackingData.Status;
+        existingTrackingData.Location=trackingData.Location;
+        await _trackingDBContext.SaveChangesAsync();
+        return Ok(existingTrackingData);
+    }
+
     [HttpPost]
+    //this endpoint is only for http way of communication
     public async Task<IActionResult> Create([FromBody] OrderExtract Data)
     {
         if (Data == null)
