@@ -2,11 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
 using TrackingService.Data;
 // using TrackingService.Worker;
-using System.Net.Http;
 using System.Text.Json;
 using TrackingService.Models;
 
-var httpclient = new HttpClient();
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -51,7 +49,7 @@ _ = Task.Run(async () =>
             using (var scope = app.Services.CreateScope())
             {
                 var dbContext = scope.ServiceProvider.GetRequiredService<TrackingDBContext>();
-                await checkqueue(httpclient, redisDB, dbContext);
+                await checkqueue(redisDB, dbContext);
             }
 
         }
@@ -63,7 +61,7 @@ _ = Task.Run(async () =>
     }
 });
 
-async Task checkqueue(HttpClient httpclient, IDatabase redisDB, TrackingDBContext dbContext)
+async Task checkqueue(IDatabase redisDB, TrackingDBContext dbContext)
 {
     var data = await redisDB.ListLeftPopAsync("queue");
     if (!data.IsNullOrEmpty)
